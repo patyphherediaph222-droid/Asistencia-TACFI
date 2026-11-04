@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TACFI - Control de Asistencia</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- QR Code Generator JS Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        
+        .pulse-scanner {
+            animation: pulse-ring 2s cubic-bezier(0.455, 0.03, 0.515, 0.955) infinite;
+        }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+
+        .fingerprint-scan {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .fingerprint-scan::after {
+            content: '';
+            position: absolute;
+            top: -100%;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(180deg, transparent, rgba(6, 182, 212, 0.5), transparent);
+            animation: scan-beam 2s infinite ease-in-out;
+        }
+
+        @keyframes scan-beam {
+            0% { top: -100%; }
+            100% { top: 100%; }
+        }
+
+        /* Custom Scrollbar for matrix table */
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 8px;
+            width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 flex flex-col justify-between">
+
+    <!-- Header Principal -->
+    <header class="bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-900 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="showScreen('home')">
+                <div class="bg-teal-500 text-slate-900 p-2.5 rounded-xl font-black text-xl shadow-md">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <div>
+                    <h1 class="font-extrabold text-lg sm:text-xl tracking-tight text-white leading-none">TACFI</h1>
+                    <p class="text-xs text-teal-300 font-medium tracking-wide">Taller Complementario de Formación Integral</p>
+                </div>
+            </div>
+            
+            <div id="headerBadge" class="hidden sm:flex items-center space-x-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold text-slate-300">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+                <span>Sistema en Vivo</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Modal de Mensaje Global -->
+    <div id="alertModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-all border border-slate-100">
+            <div id="alertIconContainer" class="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 bg-teal-100 text-teal-600">
+                <i id="alertIcon" class="fa-solid fa-circle-check text-2xl"></i>
+            </div>
+            <h3 id="alertTitle" class="text-xl font-bold text-slate-900 mb-2">Mensaje</h3>
+            <p id="alertMessage" class="text-sm text-slate-600 mb-6">Descripción del evento o mensaje.</p>
+            <button onclick="closeAlert()" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-3 px-4 rounded-xl transition shadow-md hover:shadow-lg">
+                Entendido
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-grow max-w-7xl w-full mx-auto p-4 sm:p-6">
+
+        <!-- 1. PANTALLA INICIAL DE BIENVENIDA Y SELECCIÓN -->
+        <section id="screen-home" class="space-y-8 max-w-4xl mx-auto py-4">
+            <!-- Hero Card -->
+            <div class="bg-white rounded-3xl p-6 sm:p-10 shadow-xl border border-slate-100 text-center relative overflow-hidden">
+                <div class="absolute -right-10 -top-10 w-40 h-40 bg-teal-500/10 rounded-full blur-2xl"></div>
+                <div class="absolute -left-10 -bottom-10 w-40 h-40 bg-indigo-500/10 rounded-full blur-2xl"></div>
+
+                <div class="inline-block bg-teal-50 text-teal-700 px-4 py-1.5 rounded-full text-xs font-bold tracking-wider uppercase mb-4 border border-teal-200">
+                    Control de Asistencia Digital
+                </div>
+                <h2 class="text-2xl sm:text-4xl font-black text-slate-900 mb-3 tracking-tight">
+                    Bienvenido a TACFI
+                </h2>
+                <p class="text-slate-600 max-w-lg mx-auto text-sm sm:text-base mb-8">
+                    Registra tu asistencia de forma rápida y segura mediante tu código personal o reconocimiento por huella digital.
+                </p>
+
+                <!-- QR General del Taller -->
+                <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 max-w-xs mx-auto mb-8 shadow-inner">
+                    <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">
+                        <i class="fa-solid fa-qrcode mr-1"></i> QR General del Taller
+                    </p>
+                    <div id="qrcode" class="flex justify-center p-2 bg-white rounded-xl shadow-sm border border-slate-100 min-h-[160px] items-center"></div>
+                    <p class="text-xs text-slate-400 mt-2">Escanea desde tu móvil para acceder al aula</p>
+                </div>
+
+                <!-- Botones Principales de Acceso -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto">
+                    <button onclick="showScreen('student-menu')" class="group bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white p-5 rounded-2xl font-bold shadow-lg shadow-teal-600/20 hover:shadow-xl hover:shadow-teal-600/30 transition-all flex items-center justify-center space-x-3 text-lg">
+                        <i class="fa-solid fa-user-graduate text-xl group-hover:scale-110 transition-transform"></i>
+                        <span>Estudiante</span>
+                    </button>
+                    
+                    <button onclick="openAdminModal()" class="group bg-slate-900 hover:bg-slate-800 text-white p-5 rounded-2xl font-bold shadow-lg shadow-slate-900/20 hover:shadow-xl hover:shadow-slate-900/30 transition-all flex items-center justify-center space-x-3 text-lg border border-slate-800">
+                        <i class="fa-solid fa-user-shield text-xl text-teal-400 group-hover:scale-110 transition-transform"></i>
+                        <span>Administrador</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- MODAL PIN ADMINISTRADOR -->
+        <div id="adminPinModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center relative border border-slate-100">
+                <button onclick="closeAdminModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+                <div class="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-indigo-100">
+                    <i class="fa-solid fa-lock text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-extrabold text-slate-900 mb-1">Acceso Administrativo</h3>
+                <p class="text-xs text-slate-500 mb-6">Ingresa el código PIN para acceder al panel docente</p>
+                
+                <form onsubmit="verifyAdminPin(event)">
+                    <div class="mb-6">
+                        <input type="password" id="adminPinInput" maxlength="10" placeholder="••••••••" class="w-full text-center tracking-widest text-2xl font-bold py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white text-slate-800" required>
+                    </div>
+                    <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-xl transition shadow-md">
+                        Ingresar
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 2. MENÚ ESTUDIANTE (PRIMERA VEZ vs CÓDIGO/HUELLA) -->
+        <section id="screen-student-menu" class="hidden space-y-6 max-w-xl mx-auto py-4">
+            <button onclick="showScreen('home')" class="inline-flex items-center text-sm font-semibold text-slate-600 hover:text-teal-600 transition mb-2">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Volver al Inicio
+            </button>
+
+            <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-100">
+                <div class="text-center mb-8">
+                    <h2 class="text-2xl font-black text-slate-900">Ingreso de Estudiantes</h2>
+                    <p class="text-slate-500 text-sm mt-1">Selecciona una de las opciones para marcar asistencia</p>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Opción Primera Vez -->
+                    <button onclick="showScreen('student-first-time')" class="w-full p-5 rounded-2xl border-2 border-slate-200 hover:border-teal-500 bg-slate-50/50 hover:bg-teal-50/30 transition-all text-left flex items-center space-x-4 group">
+                        <div class="w-12 h-12 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center flex-shrink-0 group-hover:bg-teal-500 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-id-card text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold text-slate-900 group-hover:text-teal-700 transition-colors">Primera Vez (Registro Inicial)</div>
+                            <div class="text-xs text-slate-500">Si es la primera sesión, busca tu nombre y registra tu huella.</div>
+                        </div>
+                    </button>
+
+                    <!-- Opción Código / Huella Digital -->
+                    <button onclick="showScreen('student-returning')" class="w-full p-5 rounded-2xl border-2 border-slate-200 hover:border-indigo-500 bg-slate-50/50 hover:bg-indigo-50/30 transition-all text-left flex items-center space-x-4 group">
+                        <div class="w-12 h-12 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                            <i class="fa-solid fa-fingerprint text-xl"></i>
+                        </div>
+                        <div>
+                            <div class="font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">Código / Huella Digital</div>
+                            <div class="text-xs text-slate-500">Para estudiantes previamente registrados con código o huella.</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. PRIMERA VEZ (SELECCIÓN DE NOMBRE DE LISTA UNIFICADA) -->
+        <section id="screen-student-first-time" class="hidden space-y-6 max-w-2xl mx-auto py-4">
+            <button onclick="showScreen('student-menu')" class="inline-flex items-center text-sm font-semibold text-slate-600 hover:text-teal-600 transition mb-2">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Volver a opciones
+            </button>
+
+            <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-100">
+                <div class="mb-6">
+                    <span class="text-xs font-bold uppercase tracking-wider text-teal-600 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">Paso 1 de 2</span>
+                    <h2 class="text-2xl font-black text-slate-900 mt-2">Registro por Primera Vez</h2>
+                    <p class="text-slate-500 text-sm">Busca tu nombre en la lista oficial. Solo aparecerá disponible si no te has registrado antes.</p>
+                </div>
+
+                <!-- Buscador de Estudiante -->
+                <div class="relative mb-4">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-3.5 text-slate-400"></i>
+                    <input type="text" id="studentSearchInput" oninput="filterStudentList()" placeholder="Buscar por Apellido o Nombre..." class="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white text-slate-800 text-sm">
+                </div>
+
+                <!-- Lista de Estudiantes -->
+                <div class="border border-slate-200 rounded-2xl overflow-hidden max-h-80 overflow-y-auto custom-scrollbar divide-y divide-slate-100" id="firstTimeList">
+                    <!-- Se llena con JS -->
+                </div>
+
+                <!-- Selección de Asistencia y Confirmación -->
+                <div id="firstTimeFormArea" class="mt-6 p-5 bg-slate-50 rounded-2xl border border-slate-200 hidden space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                        <span class="text-xs text-slate-500 font-bold uppercase">Estudiante Seleccionado</span>
+                        <span id="selectedStudentName" class="font-bold text-slate-900 text-sm"></span>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Estado de Asistencia Hoy</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <button type="button" onclick="setAttendanceStatus('PRESENTE')" id="btnStatusPresent" class="p-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center space-x-2 transition border-emerald-500 bg-emerald-50 text-emerald-700">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>PRESENTE</span>
+                            </button>
+                            <button type="button" onclick="setAttendanceStatus('ATRASO')" id="btnStatusLate" class="p-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center space-x-2 transition border-slate-200 bg-white text-slate-600 hover:border-amber-400">
+                                <i class="fa-solid fa-clock"></i>
+                                <span>ATRASO</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button onclick="proceedToBiometricRegistration()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 rounded-xl transition shadow-md flex items-center justify-center space-x-2 text-sm">
+                        <span>Siguiente: Generar Código y Registrar Huella</span>
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 4. REGISTRO DE HUELLA DIGITAL Y CÓDIGO (SIMULADOR DE BIOMETRÍA) -->
+        <section id="screen-biometric-reg" class="hidden space-y-6 max-w-xl mx-auto py-4">
+            <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-100 text-center">
+                <span class="text-xs font-bold uppercase tracking-wider text-teal-600 bg-teal-50 px-3 py-1 rounded-full border border-teal-200">Paso 2 de 2</span>
+                <h2 class="text-2xl font-black text-slate-900 mt-2">Asignación de Código y Huella</h2>
+                <p class="text-slate-500 text-sm mt-1">Guarda tu código personal para futuras asistencias</p>
+
+                <!-- Código Asignado Card -->
+                <div class="my-6 bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-6 rounded-2xl shadow-inner relative overflow-hidden">
+                    <div class="text-xs text-teal-300 font-semibold tracking-widest uppercase mb-1">Tu Código Único TACFI</div>
+                    <div id="assignedCodeDisplay" class="text-3xl sm:text-4xl font-black tracking-widest text-teal-400 font-mono my-2">TACFI-101</div>
+                    <p class="text-xs text-slate-400">Toma nota de este código o usa tu huella escaneada</p>
+                </div>
+
+                <!-- Lector de Huella Interactivo -->
+                <div class="space-y-4">
+                    <div class="text-xs font-bold text-slate-600 uppercase tracking-wider">Escáner Biométrico</div>
+                    
+                    <div id="fingerprintArea" onclick="simulateFingerprintScan()" class="cursor-pointer mx-auto w-32 h-32 rounded-full border-4 border-dashed border-teal-400 flex items-center justify-center bg-teal-50/50 hover:bg-teal-100/50 transition-all fingerprint-scan relative group">
+                        <i id="fingerprintIcon" class="fa-solid fa-fingerprint text-5xl text-teal-600 transition-transform group-hover:scale-110"></i>
+                    </div>
+
+                    <div id="biometricStatusText" class="text-xs font-medium text-slate-500">
+                        Haz clic sobre la huella para simular la lectura biométrica
+                    </div>
+                </div>
+
+                <button id="btnCompleteRegistration" onclick="finishRegistration()" disabled class="w-full mt-6 bg-slate-300 text-slate-500 font-bold py-3.5 rounded-xl transition cursor-not-allowed">
+                    Registrar Asistencia Final
+                </button>
+            </div>
+        </section>
+
+        <!-- 5. RETORNO CON CÓDIGO O HUELLA DIGITAL -->
+        <section id="screen-student-returning" class="hidden space-y-6 max-w-xl mx-auto py-4">
+            <button onclick="showScreen('student-menu')" class="inline-flex items-center text-sm font-semibold text-slate-600 hover:text-teal-600 transition mb-2">
+                <i class="fa-solid fa-arrow-left mr-2"></i> Volver a opciones
+            </button>
+
+            <div class="bg-white rounded-3xl p-6 sm:p-8 shadow-xl border border-slate-100 text-center">
+                <h2 class="text-2xl font-black text-slate-900">Ingreso Seguro</h2>
+                <p class="text-slate-500 text-sm mt-1">Ingresa con tu Código de Estudiante o escanea tu huella</p>
+
+                <!-- Tabs de Modo -->
+                <div class="flex bg-slate-100 p-1.5 rounded-2xl my-6">
+                    <button onclick="switchReturningMode('code')" id="tabCode" class="flex-1 py-2 rounded-xl text-sm font-bold bg-white text-slate-800 shadow-sm transition">
+                        <i class="fa-solid fa-key mr-2"></i> Por Código
+                    </button>
+                    <button onclick="switchReturningMode('huella')" id="tabHuella" class="flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-800 transition">
+                        <i class="fa-solid fa-fingerprint mr-2"></i> Por Huella
+                    </button>
+                </div>
+
+                <!-- Modo Código -->
+                <div id="modeCodeArea" class="space-y-4">
+                    <input type="text" id="returningCodeInput" placeholder="Ej. TACFI-101" class="w-full text-center uppercase tracking-wider text-xl font-bold py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="submitReturningAttendance('PRESENTE')" class="py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-sm transition">
+                            Marca PRESENTE
+                        </button>
+                        <button onclick="submitReturningAttendance('ATRASO')" class="py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl text-sm transition">
+                            Marca ATRASO
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Modo Huella -->
+                <div id="modeHuellaArea" class="hidden space-y-4">
+                    <div onclick="simulateReturningHuella()" class="cursor-pointer mx-auto w-32 h-32 rounded-full border-4 border-dashed border-indigo-400 flex items-center justify-center bg-indigo-50 hover:bg-indigo-100 transition-all fingerprint-scan">
+                        <i id="returningFingerIcon" class="fa-solid fa-fingerprint text-5xl text-indigo-600"></i>
+                    </div>
+                    <p class="text-xs text-slate-500">Toca la huella digital para validar la lectura biométrica</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 6. PANEL DE ADMINISTRADOR / FACILITADOR -->
+        <section id="screen-admin-panel" class="hidden space-y-6 max-w-7xl mx-auto py-4">
+            <!-- Header Bar del Admin -->
+            <div class="bg-slate-900 text-white rounded-3xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <div class="flex items-center space-x-3">
+                        <span class="bg-teal-500 text-slate-900 font-bold px-3 py-1 rounded-full text-xs">MODO FACILITADOR</span>
+                        <span class="text-xs text-slate-400">PIN Validado: 689010</span>
+                    </div>
+                    <h2 class="text-2xl font-black tracking-tight mt-1">Panel de Control de Asistencias</h2>
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-3">
+                    <button onclick="openAddDateModal()" class="bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm transition flex items-center space-x-2">
+                        <i class="fa-solid fa-calendar-plus"></i>
+                        <span>Agregar Fecha Pasar/Nueva</span>
+                    </button>
+                    <button onclick="showScreen('home')" class="bg-slate-800 hover:bg-slate-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs sm:text-sm border border-slate-700 transition flex items-center space-x-2">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Salir</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Datos Referenciales Configurables -->
+            <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Docente / Facilitador</label>
+                    <input type="text" id="adminTeacherName" value="Facilitador TACFI" onchange="saveReferentialData()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-teal-500 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 uppercase mb-1">Fecha de Sesión Activa</label>
+                    <input type="date" id="adminActiveDate" onchange="saveReferentialData()" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-sm font-semibold text-slate-800 focus:ring-2 focus:ring-teal-500 outline-none">
+                </div>
+                <div class="flex items-end">
+                    <div class="w-full bg-teal-50 border border-teal-200 rounded-xl px-4 py-2 text-xs text-teal-800 flex items-center justify-between">
+                        <div>
+                            <span class="block font-bold">Total Estudiantes</span>
+                            <span id="totalStudentsCount" class="text-lg font-black text-teal-700">33</span>
+                        </div>
+                        <i class="fa-solid fa-users text-2xl text-teal-400"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Matriz de Asistencia (Tabla Global) -->
+            <div class="bg-white rounded-3xl p-6 shadow-xl border border-slate-100 space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-900">Matriz Unificada de Asistencias</h3>
+                        <p class="text-xs text-slate-500">Orden de lista alfabético oficial (Apellidos, Nombres)</p>
+                    </div>
+
+                    <!-- Buscador en Admin -->
+                    <div class="w-full sm:w-64">
+                        <input type="text" id="adminSearchInput" oninput="renderAdminMatrix()" placeholder="Filtrar por nombre..." class="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500">
+                    </div>
+                </div>
+
+                <!-- Tabla Responsive -->
+                <div class="overflow-x-auto custom-scrollbar border border-slate-200 rounded-2xl max-h-[500px] overflow-y-auto">
+                    <table class="w-full text-left text-xs">
+                        <thead class="bg-slate-900 text-white sticky top-0 z-20">
+                            <tr id="matrixHeader">
+                                <th class="p-3.5 min-w-[50px] border-b border-slate-800">#</th>
+                                <th class="p-3.5 min-w-[220px] border-b border-slate-800">Apellidos y Nombres</th>
+                                <th class="p-3.5 min-w-[100px] border-b border-slate-800">Código ID</th>
+                                <th class="p-3.5 min-w-[90px] border-b border-slate-800 text-center">Registro</th>
+                                <!-- Columnas de Fecha dinámicas -->
+                            </tr>
+                        </thead>
+                        <tbody id="matrixBody" class="divide-y divide-slate-100 font-medium text-slate-700">
+                            <!-- JS auto populates matrix -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- MODAL AGREGAR FECHA PASADA O NUEVA (ADMIN) -->
+        <div id="addDateModal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 text-center relative border border-slate-100">
+                <button onclick="closeAddDateModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 p-2">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+                <div class="w-14 h-14 bg-teal-50 text-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-teal-100">
+                    <i class="fa-solid fa-calendar-plus text-2xl"></i>
+                </div>
+                <h3 class="text-xl font-extrabold text-slate-900 mb-1">Agregar Nueva Fecha</h3>
+                <p class="text-xs text-slate-500 mb-6">Puedes añadir una fecha pasada o futura para evaluar asistencias</p>
+
+                <form onsubmit="handleAddNewDate(event)">
+                    <div class="mb-6 text-left">
+                        <label class="block text-xs font-bold text-slate-600 uppercase mb-2">Selecciona la Fecha</label>
+                        <input type="date" id="newDateInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-teal-500 outline-none text-slate-800 font-semibold" required>
+                    </div>
+                    <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 rounded-xl transition shadow-md">
+                        Crear Columna de Fecha
+                    </button>
+                </form>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        <p>TACFI - Taller Complementario de Formación Integral &copy; 2026 | Sistema de Control de Asistencias</p>
+    </footer>
+
+    <!-- LOGIC & SCRIPTS -->
+    <script>
+        // LISTA OFICIAL UNIFICADA Y ORDENADA ALFABÉTICAMENTE (APELLIDOS, NOMBRES)
+        const INITIAL_STUDENTS = [
+            "AJNO VILLCA JANET",
+            "ALFARO CARRIZALES SERGIO",
+            "ANAHUE ORTEGA ANALIA",
+            "APARICIO PORCEL TATIANA ZULEICA",
+            "ARAMAYO REARTE NAYELI IRENE",
+            "AYLLON PAULAZANI SONIA MARIBEL",
+            "BARRIGA MENDOZA RUTH NOEMI",
+            "CAGUAY BOCAREMA ROSARIO",
+            "CALAMANI KALAMANI MARI",
+            "CALDERON DENNIS AYELEN",
+            "CATA BLANCO YASMINE",
+            "COLQUE RUEDA LUIS MANUEL",
+            "COPA JEREZ VICTOR MANUEL",
+            "CRUZ PEREZ ESTHER YAQUELIN",
+            "HEREDIA GALLO PATRICIA",
+            "HERRERA LOPEZ ANA PAOLA",
+            "LOPEZ SARDINA SALMA YOSELYN",
+            "LOPEZ YEPEZ CARMEN YANCARLA",
+            "MENDOZA MELGAR GABRIELA LILIAN",
+            "MIRANDA PADILLA NADIA",
+            "NINA KALLA PAULA JHOVANNA",
+            "NINAJA QUISPE ELIAS FERNANDO",
+            "OJEDA ZEBALLOS PAMELA SOLEDAD",
+            "PADILLA GONZALES MARIA JULIA",
+            "QUISPE ARUQUIPA ANA LAURA",
+            "ROJAS AGUIRRE JHON RODRIGO",
+            "SAIQUITA GUARACHI ARIEL",
+            "SANTOS PACO CARLA",
+            "SEGUNDO ROBLES LEONARDA YECICA",
+            "YUJRA CHAMBILLA GARI",
+            "ZURUGUAY RODRIGUEZ ARLIN MIHAEL"
+        ].sort((a, b) => a.localeCompare(b));
+
+        // PIN SECRETO
+        const ADMIN_PIN = "689010";
+
+        // ESTADO GLOBAL DE LA APLICACIÓN
+        let appState = {
+            teacherName: "Facilitador TACFI",
+            activeDate: new Date().toISOString().split('T')[0],
+            datesList: [], // Lista de fechas registradas
+            students: {}, // Objeto indexado por ID o Nombre
+            attendanceMatrix: {} // matrix[date][studentId] = 'PRESENTE'|'ATRASO'|'FALTA'
+        };
+
+        // Variable temporal para el flujo de primera vez
+        let tempSelectedStudent = null;
+        let tempSelectedStatus = 'PRESENTE';
+        let tempBiometricRegistered = false;
+
+        // INICIALIZACIÓN
+        window.onload = function() {
+            loadFromStorage();
+            generateQRCode();
+            
+            // Sincronización en tiempo real multitab/móvil
+            window.addEventListener('storage', (e) => {
+                if (e.key === 'tacfi_attendance_db') {
+                    loadFromStorage();
+                    renderFirstTimeList();
+                    renderAdminMatrix();
+                }
+            });
+
+            // Establecer fecha por defecto en input de admin
+            document.getElementById('adminActiveDate').value = appState.activeDate;
+        };
+
+        // CARGA / GUARDA LOCALSTORAGE
+        function loadFromStorage() {
+            const data = localStorage.getItem('tacfi_attendance_db');
+            if (data) {
+                try {
+                    appState = JSON.parse(data);
+                } catch(e) {
+                    initDefaultState();
+                }
+            } else {
+                initDefaultState();
+            }
+
+            // Asegurar fecha actual en la lista de fechas si no existe
+            const todayStr = new Date().toISOString().split('T')[0];
+            if (!appState.datesList.includes(todayStr)) {
+                appState.datesList.push(todayStr);
+                appState.datesList.sort();
+            }
+
+            // Guardar sincronizado
+            saveToStorage();
+        }
+
+        function initDefaultState() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            appState = {
+                teacherName: "Docente TACFI",
+                activeDate: todayStr,
+                datesList: [todayStr],
+                students: {},
+                attendanceMatrix: {}
+            };
+
+            // Poblar estudiantes base
+            INITIAL_STUDENTS.forEach((fullName, idx) => {
+                const id = `TACFI-${101 + idx}`;
+                appState.students[id] = {
+                    id: id,
+                    name: fullName,
+                    registered: false,
+                    fingerprintRegistered: false
+                };
+            });
+        }
+
+        function saveToStorage() {
+            localStorage.setItem('tacfi_attendance_db', JSON.stringify(appState));
+        }
+
+        // CONTROL DE NAVEGACIÓN ENTRE PANTALLAS
+        function showScreen(screenId) {
+            const screens = ['home', 'student-menu', 'student-first-time', 'biometric-reg', 'student-returning', 'admin-panel'];
+            screens.forEach(s => {
+                document.getElementById(`screen-${s}`).classList.add('hidden');
+            });
+
+            document.getElementById(`screen-${screenId}`).classList.remove('hidden');
+
+            if (screenId === 'student-first-time') {
+                renderFirstTimeList();
+                document.getElementById('firstTimeFormArea').classList.add('hidden');
+            } else if (screenId === 'admin-panel') {
+                renderAdminMatrix();
+            }
+        }
+
+        // QR GENERATOR
+        function generateQRCode() {
+            const qrContainer = document.getElementById("qrcode");
+            qrContainer.innerHTML = "";
+            new QRCode(qrContainer, {
+                text: window.location.href,
+                width: 150,
+                height: 150,
+                colorDark: "#0f172a",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        }
+
+        // ALERTA PERSONALIZADA
+        function showAlert(title, message, iconClass = "fa-circle-check", iconBg = "bg-teal-100 text-teal-600") {
+            document.getElementById('alertTitle').innerText = title;
+            document.getElementById('alertMessage').innerText = message;
+            
+            const iconContainer = document.getElementById('alertIconContainer');
+            iconContainer.className = `w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${iconBg}`;
+            document.getElementById('alertIcon').className = `fa-solid ${iconClass} text-2xl`;
+
+            document.getElementById('alertModal').classList.remove('hidden');
+        }
+
+        function closeAlert() {
+            document.getElementById('alertModal').classList.add('hidden');
+        }
+
+        // -------------------------------------------------------------
+        // FLUJO ADMINISTRADOR
+        // -------------------------------------------------------------
+        function openAdminModal() {
+            document.getElementById('adminPinInput').value = '';
+            document.getElementById('adminPinModal').classList.remove('hidden');
+        }
+
+        function closeAdminModal() {
+            document.getElementById('adminPinModal').classList.add('hidden');
+        }
+
+        function verifyAdminPin(e) {
+            e.preventDefault();
+            const pin = document.getElementById('adminPinInput').value.trim();
+            if (pin === ADMIN_PIN) {
+                closeAdminModal();
+                showScreen('admin-panel');
+            } else {
+                // No dar pistas según requerimiento estricto
+                showAlert("Acceso Denegado", "El código ingresado no es válido.", "fa-triangle-exclamation", "bg-rose-100 text-rose-600");
+                document.getElementById('adminPinInput').value = '';
+            }
+        }
+
+        function saveReferentialData() {
+            appState.teacherName = document.getElementById('adminTeacherName').value;
+            appState.activeDate = document.getElementById('adminActiveDate').value;
+            saveToStorage();
+        }
+
+        function renderAdminMatrix() {
+            document.getElementById('adminTeacherName').value = appState.teacherName || "Facilitador TACFI";
+            document.getElementById('adminActiveDate').value = appState.activeDate;
+
+            const headerRow = document.getElementById('matrixHeader');
+            const filterText = document.getElementById('adminSearchInput').value.toLowerCase();
+
+            // Limpiar columnas de fecha anteriores
+            while (headerRow.children.length > 4) {
+                headerRow.removeChild(headerRow.lastChild);
+            }
+
+            // Renderear Encabezados de Fechas
+            appState.datesList.forEach(dateStr => {
+                const th = document.createElement('th');
+                th.className = "p-3 border-b border-slate-800 text-center min-w-[120px]";
+                th.innerHTML = `
+                    <div class="flex flex-col items-center justify-center space-y-1">
+                        <span class="font-bold text-teal-300 text-[11px]">${dateStr}</span>
+                        <button onclick="deleteDateColumn('${dateStr}')" title="Eliminar fecha completada" class="text-rose-400 hover:text-rose-200 text-[10px] bg-rose-950/50 hover:bg-rose-900 px-1.5 py-0.5 rounded transition">
+                            <i class="fa-solid fa-trash mr-1"></i> Borrar
+                        </button>
+                    </div>
+                `;
+                headerRow.appendChild(th);
+            });
+
+            // Renderear Filas de Estudiantes
+            const tbody = document.getElementById('matrixBody');
+            tbody.innerHTML = '';
+
+            const studentList = Object.values(appState.students).sort((a, b) => a.name.localeCompare(b.name));
+            document.getElementById('totalStudentsCount').innerText = studentList.length;
+
+            let rowIdx = 1;
+            studentList.forEach(student => {
+                if (filterText && !student.name.toLowerCase().includes(filterText)) {
+                    return;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/80 transition";
+
+                tr.innerHTML = `
+                    <td class="p-3 text-slate-400 font-bold">${rowIdx++}</td>
+                    <td class="p-3 font-semibold text-slate-800">${student.name}</td>
+                    <td class="p-3 font-mono text-teal-700 font-bold">${student.id}</td>
+                    <td class="p-3 text-center">
+                        ${student.registered 
+                            ? `<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full text-[10px] font-bold">Bloqueado</span>` 
+                            : `<span class="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full text-[10px]">Libre</span>`}
+                    </td>
+                `;
+
+                // Columnas de asistencia por fecha
+                appState.datesList.forEach(dateStr => {
+                    const td = document.createElement('td');
+                    td.className = "p-2 text-center";
+
+                    const currentStatus = (appState.attendanceMatrix[dateStr] && appState.attendanceMatrix[dateStr][student.id]) || '---';
+
+                    let badgeClass = "bg-slate-100 text-slate-400";
+                    if (currentStatus === 'PRESENTE') badgeClass = "bg-emerald-500 text-white font-bold";
+                    if (currentStatus === 'ATRASO') badgeClass = "bg-amber-500 text-white font-bold";
+
+                    td.innerHTML = `
+                        <select onchange="updateMatrixCell('${dateStr}', '${student.id}', this.value)" class="text-[11px] rounded-lg px-2 py-1 outline-none font-semibold ${badgeClass} border-0 cursor-pointer">
+                            <option value="---" ${currentStatus === '---' ? 'selected' : ''} class="bg-white text-slate-800">---</option>
+                            <option value="PRESENTE" ${currentStatus === 'PRESENTE' ? 'selected' : ''} class="bg-white text-emerald-700">PRESENTE</option>
+                            <option value="ATRASO" ${currentStatus === 'ATRASO' ? 'selected' : ''} class="bg-white text-amber-700">ATRASO</option>
+                        </select>
+                    `;
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateMatrixCell(dateStr, studentId, newStatus) {
+            if (!appState.attendanceMatrix[dateStr]) {
+                appState.attendanceMatrix[dateStr] = {};
+            }
+            if (newStatus === '---') {
+                delete appState.attendanceMatrix[dateStr][studentId];
+            } else {
+                appState.attendanceMatrix[dateStr][studentId] = newStatus;
+            }
+            saveToStorage();
+            renderAdminMatrix();
+        }
+
+        function deleteDateColumn(dateStr) {
+            if (confirm(`¿Estás seguro de eliminar la casilla/columna de la fecha ${dateStr}? Esta acción es irrevocable.`)) {
+                appState.datesList = appState.datesList.filter(d => d !== dateStr);
+                delete appState.attendanceMatrix[dateStr];
+                saveToStorage();
+                renderAdminMatrix();
+                showAlert("Fecha Eliminada", `La fecha ${dateStr} fue eliminada del registro.`, "fa-trash", "bg-rose-100 text-rose-600");
+            }
+        }
+
+        function openAddDateModal() {
+            document.getElementById('newDateInput').value = new Date().toISOString().split('T')[0];
+            document.getElementById('addDateModal').classList.remove('hidden');
+        }
+
+        function closeAddDateModal() {
+            document.getElementById('addDateModal').classList.add('hidden');
+        }
+
+        function handleAddNewDate(e) {
+            e.preventDefault();
+            const selectedDate = document.getElementById('newDateInput').value;
+            if (!selectedDate) return;
+
+            if (!appState.datesList.includes(selectedDate)) {
+                appState.datesList.push(selectedDate);
+                appState.datesList.sort();
+                saveToStorage();
+                closeAddDateModal();
+                renderAdminMatrix();
+                showAlert("Nueva Fecha Agregada", `Se habilitó la columna de asistencia para ${selectedDate}.`);
+            } else {
+                showAlert("Fecha Existente", "Esa fecha ya se encuentra en la matriz.", "fa-circle-info", "bg-amber-100 text-amber-700");
+            }
+        }
+
+
+        // -------------------------------------------------------------
+        // FLUJO ESTUDIANTE: PRIMERA VEZ
+        // -------------------------------------------------------------
+        function renderFirstTimeList() {
+            const container = document.getElementById('firstTimeList');
+            container.innerHTML = '';
+
+            const studentList = Object.values(appState.students).sort((a, b) => a.name.localeCompare(b.name));
+            const filter = document.getElementById('studentSearchInput').value.toLowerCase();
+
+            studentList.forEach(st => {
+                if (filter && !st.name.toLowerCase().includes(filter)) return;
+
+                const div = document.createElement('div');
+                div.className = `p-4 flex items-center justify-between transition ${st.registered ? 'bg-slate-100 opacity-60 cursor-not-allowed' : 'hover:bg-teal-50 cursor-pointer'}`;
+                
+                div.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <div class="w-8 h-8 rounded-full ${st.registered ? 'bg-slate-300 text-slate-600' : 'bg-teal-100 text-teal-700'} font-bold text-xs flex items-center justify-center">
+                            ${st.name.charAt(0)}
+                        </div>
+                        <div>
+                            <div class="font-bold text-sm text-slate-800">${st.name}</div>
+                            <div class="text-xs text-slate-400">${st.registered ? 'Ya registrado por 1ra vez (BLOQUEADO)' : 'Disponible para primer registro'}</div>
+                        </div>
+                    </div>
+                    <div>
+                        ${st.registered 
+                            ? `<span class="bg-slate-200 text-slate-600 text-xs px-2.5 py-1 rounded-full font-bold">Bloqueado</span>`
+                            : `<button class="text-xs font-bold bg-teal-600 text-white px-3 py-1.5 rounded-lg shadow hover:bg-teal-700">Seleccionar</button>`}
+                    </div>
+                `;
+
+                if (!st.registered) {
+                    div.onclick = () => selectFirstTimeStudent(st);
+                } else {
+                    div.onclick = () => {
+                        showAlert("Nombre Bloqueado", `El estudiante ${st.name} ya realizó su registro por primera vez. Por favor ingresa por la opción 'Código de estudiante / Huella digital'.`, "fa-lock", "bg-amber-100 text-amber-700");
+                    };
+                }
+
+                container.appendChild(div);
+            });
+        }
+
+        function filterStudentList() {
+            renderFirstTimeList();
+        }
+
+        function selectFirstTimeStudent(student) {
+            tempSelectedStudent = student;
+            document.getElementById('selectedStudentName').innerText = student.name;
+            document.getElementById('firstTimeFormArea').classList.remove('hidden');
+        }
+
+        function setAttendanceStatus(status) {
+            tempSelectedStatus = status;
+            const btnPresent = document.getElementById('btnStatusPresent');
+            const btnLate = document.getElementById('btnStatusLate');
+
+            if (status === 'PRESENTE') {
+                btnPresent.className = "p-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center space-x-2 transition border-emerald-500 bg-emerald-50 text-emerald-700";
+                btnLate.className = "p-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center space-x-2 transition border-slate-200 bg-white text-slate-600 hover:border-amber-400";
+            } else {
+                btnLate.className = "p-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center space-x-2 transition border-amber-500 bg-amber-50 text-amber-700";
+                btnPresent.className = "p-3 rounded-xl border-2 font-bold text-sm flex items-center justify-center space-x-2 transition border-slate-200 bg-white text-slate-600 hover:border-emerald-400";
+            }
+        }
+
+        function proceedToBiometricRegistration() {
+            if (!tempSelectedStudent) return;
+            document.getElementById('assignedCodeDisplay').innerText = tempSelectedStudent.id;
+            
+            // Reset biométrico
+            tempBiometricRegistered = false;
+            const btn = document.getElementById('btnCompleteRegistration');
+            btn.disabled = true;
+            btn.className = "w-full mt-6 bg-slate-300 text-slate-500 font-bold py-3.5 rounded-xl transition cursor-not-allowed";
+            btn.innerText = "Registrar Asistencia Final";
+
+            document.getElementById('fingerprintIcon').className = "fa-solid fa-fingerprint text-5xl text-teal-600";
+            document.getElementById('biometricStatusText').innerText = "Haz clic sobre la huella para simular la lectura biométrica";
+
+            showScreen('biometric-reg');
+        }
+
+        function simulateFingerprintScan() {
+            const icon = document.getElementById('fingerprintIcon');
+            const statusText = document.getElementById('biometricStatusText');
+            
+            icon.className = "fa-solid fa-spinner fa-spin text-5xl text-teal-500";
+            statusText.innerText = "Escaneando y asociando huella digital...";
+
+            setTimeout(() => {
+                icon.className = "fa-solid fa-circle-check text-5xl text-emerald-500 animate-bounce";
+                statusText.innerText = "¡Huella Digital capturada y asociada con éxito!";
+                
+                tempBiometricRegistered = true;
+                const btn = document.getElementById('btnCompleteRegistration');
+                btn.disabled = false;
+                btn.className = "w-full mt-6 bg-teal-600 hover:bg-teal-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg cursor-pointer";
+                btn.innerText = "Completar Registro y Guardar Asistencia";
+            }, 1500);
+        }
+
+        function finishRegistration() {
+            if (!tempSelectedStudent || !tempBiometricRegistered) return;
+
+            const studentId = tempSelectedStudent.id;
+            const todayStr = appState.activeDate;
+
+            // Marcar como registrado
+            appState.students[studentId].registered = true;
+            appState.students[studentId].fingerprintRegistered = true;
+
+            // Guardar asistencia de hoy
+            if (!appState.attendanceMatrix[todayStr]) {
+                appState.attendanceMatrix[todayStr] = {};
+            }
+            appState.attendanceMatrix[todayStr][studentId] = tempSelectedStatus;
+
+            saveToStorage();
+
+            showAlert(
+                "¡Asistencia Registrada!",
+                `Tu registro inicial fue exitoso. Tu código es ${studentId}. Recuerda que a partir de la próxima clase solo ingresarás por Código o Huella.`,
+                "fa-circle-check",
+                "bg-emerald-100 text-emerald-600"
+            );
+
+            showScreen('home');
+        }
+
+
+        // -------------------------------------------------------------
+        // FLUJO ESTUDIANTE: CÓDIGO O HUELLA (RETORNANTE)
+        // -------------------------------------------------------------
+        function switchReturningMode(mode) {
+            const tabCode = document.getElementById('tabCode');
+            const tabHuella = document.getElementById('tabHuella');
+            const modeCodeArea = document.getElementById('modeCodeArea');
+            const modeHuellaArea = document.getElementById('modeHuellaArea');
+
+            if (mode === 'code') {
+                tabCode.className = "flex-1 py-2 rounded-xl text-sm font-bold bg-white text-slate-800 shadow-sm transition";
+                tabHuella.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-800 transition";
+                modeCodeArea.classList.remove('hidden');
+                modeHuellaArea.classList.add('hidden');
+            } else {
+                tabHuella.className = "flex-1 py-2 rounded-xl text-sm font-bold bg-white text-slate-800 shadow-sm transition";
+                tabCode.className = "flex-1 py-2 rounded-xl text-sm font-bold text-slate-500 hover:text-slate-800 transition";
+                modeHuellaArea.classList.remove('hidden');
+                modeCodeArea.classList.add('hidden');
+            }
+        }
+
+        function submitReturningAttendance(status) {
+            const codeInput = document.getElementById('returningCodeInput').value.trim().toUpperCase();
+            if (!codeInput) {
+                showAlert("Campo Requerido", "Por favor ingresa tu Código de Estudiante.", "fa-circle-info", "bg-amber-100 text-amber-700");
+                return;
+            }
+
+            const student = appState.students[codeInput];
+            if (!student) {
+                showAlert("Código No Encontrado", "El código ingresado no existe en el sistema TACFI.", "fa-circle-xmark", "bg-rose-100 text-rose-600");
+                return;
+            }
+
+            const todayStr = appState.activeDate;
+            if (!appState.attendanceMatrix[todayStr]) {
+                appState.attendanceMatrix[todayStr] = {};
+            }
+
+            appState.attendanceMatrix[todayStr][student.id] = status;
+            saveToStorage();
+
+            document.getElementById('returningCodeInput').value = '';
+            showAlert("Asistencia Registrada", `Asistencia (${status}) marcada correctamente para: ${student.name}`);
+            showScreen('home');
+        }
+
+        function simulateReturningHuella() {
+            const icon = document.getElementById('returningFingerIcon');
+            icon.className = "fa-solid fa-spinner fa-spin text-5xl text-indigo-500";
+
+            setTimeout(() => {
+                // Seleccionar un estudiante registrado aleatorio o el primero para demostración rápida
+                const registeredList = Object.values(appState.students).filter(s => s.registered);
+
+                if (registeredList.length === 0) {
+                    icon.className = "fa-solid fa-fingerprint text-5xl text-indigo-600";
+                    showAlert("Sin Registros", "Aún no hay ningún estudiante registrado por primera vez para comparar huella.", "fa-circle-info", "bg-amber-100 text-amber-700");
+                    return;
+                }
+
+                const randomStudent = registeredList[Math.floor(Math.random() * registeredList.length)];
+                const todayStr = appState.activeDate;
+
+                if (!appState.attendanceMatrix[todayStr]) {
+                    appState.attendanceMatrix[todayStr] = {};
+                }
+
+                appState.attendanceMatrix[todayStr][randomStudent.id] = "PRESENTE";
+                saveToStorage();
+
+                icon.className = "fa-solid fa-circle-check text-5xl text-emerald-500";
+                showAlert("¡Huella Reconocida!", `Bienvenido ${randomStudent.name}. Se ha marcado tu asistencia como PRESENTE para la fecha ${todayStr}.`);
+                
+                setTimeout(() => {
+                    icon.className = "fa-solid fa-fingerprint text-5xl text-indigo-600";
+                    showScreen('home');
+                }, 1000);
+            }, 1200);
+        }
+    </script>
+</body>
+</html>
